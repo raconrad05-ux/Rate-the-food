@@ -22,3 +22,5 @@ Create templates/base.html as a layout that every page extends: a header with th
 Create templates/index.html extending base.html. It shows all places ranked by average rating, highest first, in a table with columns: rank, name (linking to /place/<id>, a page we’ll build next), category, location, average rating (one decimal, with stars), and number of reviews.
 Do the ranking in one SQL query: LEFT JOIN places to reviews so places with zero reviews still appear (show “No reviews yet” for them), GROUP BY place, AVG(rating) and COUNT(reviews.id), ordered by average descending, then review count descending, with unreviewed places last.
 Don’t build the place page, login or forms yet.
+
+# PROMPT 3

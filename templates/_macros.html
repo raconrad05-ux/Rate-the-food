@@ -1,0 +1,9 @@
+{# Shared bits of HTML. Use with: {% from "_macros.html" import stars %} #}
+
+{# Show a rating as stars, e.g. 4.5 -> ★★★★★
+   Adding 0.5 then dropping the decimals rounds to the nearest whole star
+   (Jinja's round filter would turn 4.5 into 4). #}
+{% macro stars(rating) -%}
+  {%- set full = (rating + 0.5) | int -%}
+  <span class="stars">{{ "★" * full }}{{ "☆" * (5 - full) }}</span>
+{%- endmacro %}

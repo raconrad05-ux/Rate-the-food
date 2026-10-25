@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stars %}
+
+{% block title %}{{ place.name }} – Rate the Food{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('index') }}">&larr; All places</a></p>
+
+<h1>{{ place.name }}</h1>
+<p class="muted">{{ place.category }} &middot; {{ place.location }}</p>
+{% if place.description %}<p>{{ place.description }}</p>{% endif %}
+
+{% if summary.review_count %}
+  <p>
+    {{ stars(summary.avg_rating) }}
+    <strong>{{ "%.1f" | format(summary.avg_rating) }}</strong>
+    from {{ summary.review_count }} review{{ "s" if summary.review_count != 1 }}
+  </p>
+
+  <h2>Rating breakdown</h2>
+  {# Fixed-height box so the chart doesn't grow too tall #}
+  <div style="height: 250px;">
+    <canvas id="ratingChart"></canvas>
+  </div>
+{% else %}
+  <p class="muted">No reviews yet</p>
+{% endif %}
+
+<h2>Reviews</h2>
+{% for review in reviews %}
+  <article>
+    <header>
+      <strong>{{ review.username }}</strong>
+      {{ stars(review.rating) }}
+      {# created_at looks like "2026-10-25 14:03:00"; keep just the date part #}
+      <small class="muted">{{ review.created_at[:10] }}</small>
+    </header>
+    <p>{{ review.body }}</p>
+  </article>
+{% else %}
+  <p class="muted">Be the first to review this place.</p>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+{% if summary.review_count %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  // tojson turns the Python list into a JavaScript array, e.g. [0, 1, 0, 2, 1]
+  const counts = {{ rating_counts | tojson }};
+
+  new Chart(document.getElementById("ratingChart"), {
+    type: "bar",
+    data: {
+      labels: ["1 star", "2 stars", "3 stars", "4 stars", "5 stars"],
+      datasets: [{ label: "Reviews", data: counts, backgroundColor: "#e0a800" }],
+    },
+    options: {
+      maintainAspectRatio: false,          // fill the 250px box
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },  // whole numbers only
+    },
+  });
+</script>
+{% endif %}
+{% endblock %}

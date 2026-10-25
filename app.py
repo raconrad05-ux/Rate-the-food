@@ -1,7 +1,7 @@
 import os
 import sqlite3
 
-from flask import Flask, g, render_template
+from flask import Flask, abort, g, render_template
 from werkzeug.security import generate_password_hash
 
 app = Flask(__name__)
@@ -193,3 +193,54 @@ def index():
         ORDER BY avg_rating IS NULL, avg_rating DESC, review_count DESC, places.name
     """).fetchall()
     return render_template("index.html", places=places)
+
+
+@app.route("/place/<int:place_id>")
+def place(place_id):
+    """Detail page for one place: info, rating summary, chart and reviews."""
+    db = get_db()
+
+    place = db.execute("SELECT * FROM places WHERE id = ?", (place_id,)).fetchone()
+    if place is None:
+        abort(404)  # handled by page_not_found() below
+
+    summary = db.execute(
+        """SELECT AVG(rating) AS avg_rating, COUNT(*) AS review_count
+           FROM reviews WHERE place_id = ?""",
+        (place_id,),
+    ).fetchone()
+
+    # SQL only returns ratings that actually appear, e.g. {4: 2, 5: 1},
+    # so start every star level at 0 and fill in the real counts.
+    rows = db.execute(
+        "SELECT rating, COUNT(*) AS n FROM reviews WHERE place_id = ? GROUP BY rating",
+        (place_id,),
+    ).fetchall()
+    counts = {stars: 0 for stars in range(1, 6)}
+    for row in rows:
+        counts[row["rating"]] = row["n"]
+    rating_counts = [counts[stars] for stars in range(1, 6)]  # [1-star, ..., 5-star]
+
+    # Newest first; id breaks ties when two reviews have the same timestamp.
+    reviews = db.execute(
+        """SELECT reviews.rating, reviews.body, reviews.created_at, users.username
+           FROM reviews
+           JOIN users ON users.id = reviews.user_id
+           WHERE reviews.place_id = ?
+           ORDER BY reviews.created_at DESC, reviews.id DESC""",
+        (place_id,),
+    ).fetchall()
+
+    return render_template(
+        "place.html",
+        place=place,
+        summary=summary,
+        rating_counts=rating_counts,
+        reviews=reviews,
+    )
+
+
+@app.errorhandler(404)
+def page_not_found(error):
+    """Show a friendly page for bad URLs and missing places."""
+    return render_template("404.html"), 404
