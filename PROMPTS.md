@@ -45,7 +45,7 @@ Log out at /logout, POST only (a small form button in the header), which clears 
 A before_request function that loads the logged-in user into g.user (or None). If the session points to a user that no longer exists, clear the session.
 A login_required decorator (using functools.wraps) that redirects to /login?next=<current path> with a flash message if nobody is logged in. We’ll use it in the next step.
 In base.html, the header shows “Log in” and “Register” links when logged out, and “Logged in as <username>“ plus a Log out button when logged in.
-Templates register.html and login.html extend base.html.flask --app app run --port 5001
+Templates register.html and login.html extend base.html.
 
 # PROMPT 5
 Next step: logged-in users write, edit and delete their own reviews. Keep it simple, with short comments.
