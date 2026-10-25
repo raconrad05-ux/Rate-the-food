@@ -26,16 +26,56 @@
   <p class="muted">No reviews yet</p>
 {% endif %}
 
+{# ---- Write / edit / delete your review ---- #}
+{% if not g.user %}
+  <p><a href="{{ url_for('login', next=url_for('place', place_id=place.id)) }}">Log in to write a review</a></p>
+{% else %}
+  <section class="form-box">
+    <h2>{{ "Edit your review" if my_review else "Write a review" }}</h2>
+    {# The same route creates and edits. There's no user id in the form;
+       the server uses the logged-in user from the session. #}
+    <form method="post" action="{{ url_for('save_review', place_id=place.id) }}">
+      <fieldset>
+        <legend>Rating</legend>
+        {% for n in range(5, 0, -1) %}
+          <label>
+            <input type="radio" name="rating" value="{{ n }}" required
+                   {% if my_review and my_review.rating == n %}checked{% endif %}>
+            {{ stars(n) }} {{ n }}
+          </label>
+        {% endfor %}
+      </fieldset>
+      <label>
+        Your review
+        <textarea name="body" rows="4" maxlength="500" required>{{ my_review.body if my_review }}</textarea>
+        <small>Up to 500 characters.</small>
+      </label>
+      <button type="submit">{{ "Update review" if my_review else "Post review" }}</button>
+    </form>
+
+    {% if my_review %}
+      {# A separate form, so deleting is its own deliberate click #}
+      <form method="post" action="{{ url_for('delete_review', place_id=place.id) }}"
+            onsubmit="return confirm('Delete your review?');">
+        <button type="submit" class="secondary outline">Delete my review</button>
+      </form>
+    {% endif %}
+  </section>
+{% endif %}
+
 <h2>Reviews</h2>
 {% for review in reviews %}
   <article>
     <header>
       <strong>{{ review.username }}</strong>
+      {% if g.user and review.user_id == g.user.id %}<span class="muted">(you)</span>{% endif %}
       {{ stars(review.rating) }}
       {# created_at looks like "2026-10-25 14:03:00"; keep just the date part #}
       <small class="muted">{{ review.created_at[:10] }}</small>
+      {# These timestamp strings sort correctly, so > works for comparing them #}
+      {% if review.updated_at > review.created_at %}<small class="muted">(edited)</small>{% endif %}
     </header>
-    <p>{{ review.body }}</p>
+    <p class="review-body">{{ review.body }}</p>
   </article>
 {% else %}
   <p class="muted">Be the first to review this place.</p>

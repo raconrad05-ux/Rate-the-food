@@ -13,8 +13,9 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or os.urandom(32)
 
 # food.db lives in the same folder as this file.
+# Set FOOD_DB to use a different file instead (e.g. a throwaway test database).
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE = os.path.join(BASE_DIR, "food.db")
+DATABASE = os.environ.get("FOOD_DB") or os.path.join(BASE_DIR, "food.db")
 
 
 def connect():
@@ -46,7 +47,7 @@ def init_db():
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS users (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            username      TEXT NOT NULL UNIQUE,
+            username      TEXT NOT NULL UNIQUE COLLATE NOCASE,  -- "Demo" = "demo"
             password_hash TEXT NOT NULL,
             created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
@@ -201,6 +202,10 @@ def login_required(view):
     def wrapped_view(*args, **kwargs):
         if g.user is None:
             flash("Please log in first.", "info")
+            # Only come back to GET pages: a POST-only URL like
+            # /place/3/review would give "Method Not Allowed" after logging in.
+            if request.method != "GET":
+                return redirect(url_for("login"))
             # full_path includes the query string; it ends in "?" if there isn't one
             return redirect(url_for("login", next=request.full_path.rstrip("?")))
         return view(*args, **kwargs)
@@ -338,7 +343,8 @@ def place(place_id):
 
     # Newest first; id breaks ties when two reviews have the same timestamp.
     reviews = db.execute(
-        """SELECT reviews.rating, reviews.body, reviews.created_at, users.username
+        """SELECT reviews.user_id, reviews.rating, reviews.body,
+                  reviews.created_at, reviews.updated_at, users.username
            FROM reviews
            JOIN users ON users.id = reviews.user_id
            WHERE reviews.place_id = ?
@@ -346,13 +352,92 @@ def place(place_id):
         (place_id,),
     ).fetchall()
 
+    # The logged-in user's own review of this place, if they wrote one.
+    # The template uses it to pick "Write a review" vs. "Edit your review".
+    my_review = None
+    if g.user is not None:
+        my_review = db.execute(
+            "SELECT rating, body FROM reviews WHERE user_id = ? AND place_id = ?",
+            (g.user["id"], place_id),
+        ).fetchone()
+
     return render_template(
         "place.html",
         place=place,
         summary=summary,
         rating_counts=rating_counts,
         reviews=reviews,
+        my_review=my_review,
     )
+
+
+# Security note: both review routes below use g.user["id"], which comes from
+# the signed session cookie, never a user id sent in the form. That is why a
+# user can only ever create, edit or delete their own review.
+
+@app.route("/place/<int:place_id>/review", methods=["POST"])
+@login_required
+def save_review(place_id):
+    """Create a new review, or update the user's existing one."""
+    db = get_db()
+    if db.execute("SELECT 1 FROM places WHERE id = ?", (place_id,)).fetchone() is None:
+        abort(404)
+
+    # The rating must be a whole number from 1 to 5 ("4.5" or "abc" fail int()).
+    try:
+        rating = int(request.form.get("rating", ""))
+    except ValueError:
+        rating = None
+
+    # Browsers send line breaks as "\r\n"; count them as one character.
+    body = request.form.get("body", "").replace("\r\n", "\n").strip()
+
+    error = None
+    if rating is None or not 1 <= rating <= 5:
+        error = "Please choose a rating from 1 to 5 stars."
+    elif len(body) == 0:
+        error = "Please write something in your review."
+    elif len(body) > 500:
+        error = f"Reviews can be at most 500 characters (yours is {len(body)})."
+
+    if error is not None:
+        flash(error, "error")
+        return redirect(url_for("place", place_id=place_id))
+
+    # One statement for both cases: INSERT a new row, or, if this user already
+    # reviewed this place (the UNIQUE rule), UPDATE that row instead.
+    # "excluded" means the values we just tried to insert. created_at is left
+    # alone on an edit, so updated_at > created_at marks an edited review.
+    db.execute(
+        """INSERT INTO reviews (user_id, place_id, rating, body)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(user_id, place_id) DO UPDATE SET
+               rating = excluded.rating,
+               body = excluded.body,
+               updated_at = CURRENT_TIMESTAMP""",
+        (g.user["id"], place_id, rating, body),
+    )
+    db.commit()
+    flash("Review saved", "success")
+    return redirect(url_for("place", place_id=place_id))
+
+
+@app.route("/place/<int:place_id>/review/delete", methods=["POST"])
+@login_required
+def delete_review(place_id):
+    """Delete the logged-in user's review of this place."""
+    db = get_db()
+    # Matching on both columns means this can only delete the user's own review.
+    cursor = db.execute(
+        "DELETE FROM reviews WHERE user_id = ? AND place_id = ?",
+        (g.user["id"], place_id),
+    )
+    db.commit()
+    if cursor.rowcount:
+        flash("Your review was deleted.", "success")
+    else:
+        flash("There was no review to delete.", "info")
+    return redirect(url_for("place", place_id=place_id))
 
 
 @app.errorhandler(404)

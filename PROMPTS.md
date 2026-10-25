@@ -45,4 +45,17 @@ Log out at /logout, POST only (a small form button in the header), which clears 
 A before_request function that loads the logged-in user into g.user (or None). If the session points to a user that no longer exists, clear the session.
 A login_required decorator (using functools.wraps) that redirects to /login?next=<current path> with a flash message if nobody is logged in. We’ll use it in the next step.
 In base.html, the header shows “Log in” and “Register” links when logged out, and “Logged in as <username>“ plus a Log out button when logged in.
-Templates register.html and login.html extend base.html.
+Templates register.html and login.html extend base.html.flask --app app run --port 5001
+
+# PROMPT 5
+Next step: logged-in users write, edit and delete their own reviews. Keep it simple, with short comments.
+
+On place.html, below the place info:
+Logged out: a link “Log in to write a review” that goes to /login?next=<this place's URL>.
+Logged in, no review yet: a “Write a review” form with a rating (1 to 5, as radio buttons or a select) and a text box.
+Logged in, already reviewed: an “Edit your review” form pre-filled with their rating and text, plus a separate “Delete my review” button.
+In the review list, mark the current user’s own review with “(you)”, and show “(edited)” on any review whose updated_at is later than created_at.
+POST /place/<int:place_id>/review with @login_required: 404 if the place doesn’t exist. Validate that the rating is a whole number from 1 to 5 and the text is 1 to 500 characters after trimming whitespace; on error, flash a clear message and redirect back to the place page. Save with a single INSERT ... ON CONFLICT(user_id, place_id) DO UPDATE so the same route both creates and edits, and set updated_at on an edit. Flash “Review saved” and redirect to the place page.
+POST /place/<int:place_id>/review/delete with @login_required: delete only the row matching both this place and g.user’s id. Flash a message and redirect back.
+A user can only ever change their own review because every write uses g.user["id"] from the session, never a user id sent by the form. Add a comment saying so.
+Make sure the average, count and chart on the place page and the home page ranking all reflect changes immediately (they should, since they’re computed by queries).
