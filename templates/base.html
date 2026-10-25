@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Rate the Food{% endblock %}</title>
+  <!-- Pico CSS gives us nice default styles for plain HTML -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    /* A few small tweaks on top of Pico */
+    .site-name { font-weight: bold; text-decoration: none; }
+    .stars { color: #e0a800; letter-spacing: 1px; }
+    .muted { color: var(--pico-muted-color); }
+    .flash { padding: 0.75rem 1rem; border-radius: var(--pico-border-radius); }
+    .flash.success { background: #d1f2d9; color: #14532d; }
+    .flash.error { background: #fbd5d5; color: #7f1d1d; }
+    .flash.info { background: #dbeafe; color: #1e3a8a; }
+  </style>
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul>
+        <li><a href="{{ url_for('index') }}" class="site-name">Rate the Food</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    {# Messages from flash("...", "category") in app.py show up here #}
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      <p class="flash {{ category }}">{{ message }}</p>
+    {% endfor %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="container">
+    <small class="muted">Rate the Food &middot; Places to eat on and around Santa Clara University</small>
+  </footer>
+</body>
+</html>

@@ -1,4 +1,4 @@
-## PROMPT 1
+# PROMPT 1
 I’m building “Rate the Food”, a Flask app for rating places to eat on and around Santa Clara University. This is a class assignment, and I want to understand the code, so keep it simple and add short comments. Only do this step; don’t build pages or login yet.
 
 Create app.py with:
@@ -14,3 +14,11 @@ Call init_db() and seed_db() at module level (not inside if __name__ == "__main_
 A temporary / route that returns plain text showing how many users, places and reviews are in the database.
 
 Don’t add any new packages; Flask and Werkzeug are already in requirements.txt.
+
+# PROMPT 2
+Next step: replace the temporary / route with a real home page. Keep it simple, with short comments.
+
+Create templates/base.html as a layout that every page extends: a header with the site name “Rate the Food” linking to /, a {% block content %}, and a footer. Show flashed messages (get_flashed_messages(with_categories=true)) above the content, since later steps will use them. For styling, link Pico CSS from a CDN (https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css) and add only a small amount of custom CSS in a <style> tag.
+Create templates/index.html extending base.html. It shows all places ranked by average rating, highest first, in a table with columns: rank, name (linking to /place/<id>, a page we’ll build next), category, location, average rating (one decimal, with stars), and number of reviews.
+Do the ranking in one SQL query: LEFT JOIN places to reviews so places with zero reviews still appear (show “No reviews yet” for them), GROUP BY place, AVG(rating) and COUNT(reviews.id), ordered by average descending, then review count descending, with unreviewed places last.
+Don’t build the place page, login or forms yet.

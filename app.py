@@ -1,7 +1,7 @@
 import os
 import sqlite3
 
-from flask import Flask, g
+from flask import Flask, g, render_template
 from werkzeug.security import generate_password_hash
 
 app = Flask(__name__)
@@ -179,10 +179,17 @@ seed_db()
 
 @app.route("/")
 def index():
-    """Temporary page: show how many rows are in each table."""
-    db = get_db()
-    users = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    places = db.execute("SELECT COUNT(*) FROM places").fetchone()[0]
-    reviews = db.execute("SELECT COUNT(*) FROM reviews").fetchone()[0]
-    text = f"Users: {users}\nPlaces: {places}\nReviews: {reviews}\n"
-    return text, 200, {"Content-Type": "text/plain"}
+    """Home page: every place, ranked by average rating."""
+    # LEFT JOIN keeps places with no reviews (their AVG is NULL, COUNT is 0).
+    # "avg_rating IS NULL" is 0 for reviewed places and 1 for unreviewed,
+    # so sorting on it first puts unreviewed places at the bottom.
+    places = get_db().execute("""
+        SELECT places.id, places.name, places.category, places.location,
+               AVG(reviews.rating) AS avg_rating,
+               COUNT(reviews.id)   AS review_count
+        FROM places
+        LEFT JOIN reviews ON reviews.place_id = places.id
+        GROUP BY places.id
+        ORDER BY avg_rating IS NULL, avg_rating DESC, review_count DESC, places.name
+    """).fetchall()
+    return render_template("index.html", places=places)

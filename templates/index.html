@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Top places to eat</h1>
+<p class="muted">Ranked by average rating from SCU students.</p>
+
+<div class="overflow-auto">
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Name</th>
+      <th>Category</th>
+      <th>Location</th>
+      <th>Average rating</th>
+      <th>Reviews</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for place in places %}
+    <tr>
+      {# loop.index counts 1, 2, 3, ... so it works as the rank #}
+      <td>{{ loop.index }}</td>
+      {# Plain link for now; the /place/<id> page comes in the next step #}
+      <td><a href="/place/{{ place.id }}">{{ place.name }}</a></td>
+      <td>{{ place.category }}</td>
+      <td>{{ place.location }}</td>
+      <td>
+        {% if place.review_count %}
+          {# Round to the nearest whole star (adding 0.5 makes 4.5 round up to 5),
+             then fill the rest with empty stars #}
+          {% set full = (place.avg_rating + 0.5) | int %}
+          <span class="stars">{{ "★" * full }}{{ "☆" * (5 - full) }}</span>
+          {{ "%.1f" | format(place.avg_rating) }}
+        {% else %}
+          <span class="muted">No reviews yet</span>
+        {% endif %}
+      </td>
+      <td>{{ place.review_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
