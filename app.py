@@ -1,8 +1,11 @@
 import os
+import re
 import sqlite3
+from functools import wraps
 
-from flask import Flask, abort, g, render_template
-from werkzeug.security import generate_password_hash
+from flask import (Flask, abort, flash, g, redirect, render_template, request,
+                   session, url_for)
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 
@@ -175,6 +178,118 @@ def seed_db():
 # Run at import time so this works with `flask run` and with gunicorn.
 init_db()
 seed_db()
+
+
+# ---- User accounts ----
+
+@app.before_request
+def load_logged_in_user():
+    """Before every request, put the logged-in user (or None) in g.user."""
+    user_id = session.get("user_id")
+    g.user = None
+    if user_id is not None:
+        g.user = get_db().execute(
+            "SELECT id, username FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if g.user is None:
+            session.clear()  # the user was deleted, so forget the old login
+
+
+def login_required(view):
+    """Decorator for pages that need a logged-in user."""
+    @wraps(view)  # keeps the view's name so url_for still works
+    def wrapped_view(*args, **kwargs):
+        if g.user is None:
+            flash("Please log in first.", "info")
+            # full_path includes the query string; it ends in "?" if there isn't one
+            return redirect(url_for("login", next=request.full_path.rstrip("?")))
+        return view(*args, **kwargs)
+    return wrapped_view
+
+
+def is_safe_next(url):
+    """Only allow redirects to paths on this site, like /place/3.
+
+    "//evil.com" (and "/\\evil.com", which browsers treat the same way)
+    would send the user to another website, so those are rejected.
+    """
+    return bool(url) and url.startswith("/") and not url.startswith("//") and "\\" not in url
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "GET":
+        return render_template("register.html", username="")
+
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    confirm = request.form.get("confirm", "")
+
+    # Check the rules one at a time and stop at the first problem.
+    error = None
+    if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", username):
+        error = "Username must be 3 to 20 characters: letters, digits and underscores only."
+    elif len(password) < 8:
+        error = "Password must be at least 8 characters."
+    elif password != confirm:
+        error = "Passwords don't match."
+
+    if error is None:
+        db = get_db()
+        try:
+            cursor = db.execute(
+                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                (username, generate_password_hash(password)),
+            )
+            db.commit()
+        except sqlite3.IntegrityError:
+            # The UNIQUE rule on username failed, so the name is taken.
+            error = f"The username {username} is already taken."
+
+    if error is not None:
+        flash(error, "error")
+        # Re-show the form with the username filled in (never the password).
+        return render_template("register.html", username=username)
+
+    # Log the new user in right away.
+    session.clear()
+    session["user_id"] = cursor.lastrowid
+    flash(f"Welcome, {username}! Your account is ready.", "success")
+    return redirect(url_for("index"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    # "next" is the page to go back to after logging in, e.g. /place/3
+    next_url = request.args.get("next", "")
+
+    if request.method == "GET":
+        return render_template("login.html", username="", next_url=next_url)
+
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    user = get_db().execute(
+        "SELECT id, username, password_hash FROM users WHERE username = ?", (username,)
+    ).fetchone()
+
+    # Same message whether the username or the password was wrong,
+    # so nobody can use this form to find out which usernames exist.
+    if user is None or not check_password_hash(user["password_hash"], password):
+        flash("Invalid username or password", "error")
+        return render_template("login.html", username=username, next_url=next_url)
+
+    # clear() first so no data from before the login carries over.
+    session.clear()
+    session["user_id"] = user["id"]
+    flash(f"Welcome back, {user['username']}!", "success")
+    return redirect(next_url if is_safe_next(next_url) else url_for("index"))
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    flash("You've been logged out.", "info")
+    return redirect(url_for("index"))
 
 
 @app.route("/")

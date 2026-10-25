@@ -24,3 +24,25 @@ Do the ranking in one SQL query: LEFT JOIN places to reviews so places with zero
 Don’t build the place page, login or forms yet.
 
 # PROMPT 3
+Next step: the place detail page. Keep it simple, with short comments.
+
+Add a route /place/<int:place_id>. Look up the place; if it doesn’t exist, call abort(404).
+Add a 404 error handler that renders templates/404.html (extending base.html) with a clear message like “That page or place doesn’t exist” and a link back home. Return the 404 status code.
+Create templates/place.html showing:
+the place’s name, category, location and description
+the average rating (one decimal, with stars, using the same rounding as the home page) and the number of reviews, or “No reviews yet”
+a bar chart of how many reviews gave 1, 2, 3, 4 and 5 stars. Count them in SQL with GROUP BY rating and fill in zero for missing ratings in Python, so the chart always has all five bars. Use Chart.js from https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js and pass the counts into JavaScript with Jinja’s tojson filter. Skip the chart if there are no reviews.
+the list of reviews, newest first, each showing the reviewer’s username, star rating, the review text and the date. Get them with a JOIN to users.
+In index.html, replace the hard-coded /place/<id> links with url_for('place', place_id=...) now that the route exists.
+Don’t build login or review forms yet.
+
+# PROMPT 4
+Next step: user accounts. Keep it simple, with short comments. Don’t build review forms yet.
+
+Register at /register: GET shows a form (username, password, confirm password); POST validates and creates the user. Rules: username 3 to 20 characters, only letters, digits and underscores; password at least 8 characters; the two passwords must match. Hash with werkzeug.security.generate_password_hash. If the username is taken, catch sqlite3.IntegrityError and show a clear message. On any error, flash the message and re-show the form with the username still filled in (never the password). On success, log the user in and redirect to the home page with a success flash.
+Log in at /login: GET shows the form; POST checks the password with check_password_hash. On failure, show one generic message, “Invalid username or password”, without revealing which part was wrong. On success, store user_id in session. Support an optional next query parameter so a login can return the user to the page they came from, but only accept it if it is a relative path starting with / and not //; otherwise go home.
+Log out at /logout, POST only (a small form button in the header), which clears the session.
+A before_request function that loads the logged-in user into g.user (or None). If the session points to a user that no longer exists, clear the session.
+A login_required decorator (using functools.wraps) that redirects to /login?next=<current path> with a flash message if nobody is logged in. We’ll use it in the next step.
+In base.html, the header shows “Log in” and “Register” links when logged out, and “Logged in as <username>“ plus a Log out button when logged in.
+Templates register.html and login.html extend base.html.

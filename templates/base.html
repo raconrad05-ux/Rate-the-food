@@ -15,6 +15,10 @@
     .flash.success { background: #d1f2d9; color: #14532d; }
     .flash.error { background: #fbd5d5; color: #7f1d1d; }
     .flash.info { background: #dbeafe; color: #1e3a8a; }
+    /* Keep the header's Log out button small and on one line */
+    .inline-form { margin: 0; }
+    .inline-form button { margin: 0; padding: 0.3rem 0.8rem; }
+    .form-box { max-width: 28rem; }
   </style>
 </head>
 <body>
@@ -22,6 +26,21 @@
     <nav>
       <ul>
         <li><a href="{{ url_for('index') }}" class="site-name">Rate the Food</a></li>
+      </ul>
+      <ul>
+        {# g.user is set by load_logged_in_user() in app.py #}
+        {% if g.user %}
+          <li>Logged in as <strong>{{ g.user.username }}</strong></li>
+          <li>
+            {# Logging out changes state, so it's a POST form, not a link #}
+            <form action="{{ url_for('logout') }}" method="post" class="inline-form">
+              <button type="submit" class="secondary outline">Log out</button>
+            </form>
+          </li>
+        {% else %}
+          <li><a href="{{ url_for('login') }}">Log in</a></li>
+          <li><a href="{{ url_for('register') }}">Register</a></li>
+        {% endif %}
       </ul>
     </nav>
   </header>

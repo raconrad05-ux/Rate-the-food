@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Register – Rate the Food{% endblock %}
+
+{% block content %}
+<section class="form-box">
+  <h1>Create an account</h1>
+  <form method="post">
+    <label>
+      Username
+      {# value keeps what the user typed if there was an error #}
+      <input name="username" value="{{ username }}" required
+             minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" autocomplete="username">
+      <small>3 to 20 characters: letters, digits and underscores.</small>
+    </label>
+    <label>
+      Password
+      {# Password fields never get a value, so they're always blank #}
+      <input type="password" name="password" required minlength="8" autocomplete="new-password">
+      <small>At least 8 characters.</small>
+    </label>
+    <label>
+      Confirm password
+      <input type="password" name="confirm" required minlength="8" autocomplete="new-password">
+    </label>
+    <button type="submit">Register</button>
+  </form>
+  <p>Already have an account? <a href="{{ url_for('login') }}">Log in</a></p>
+</section>
+{% endblock %}
