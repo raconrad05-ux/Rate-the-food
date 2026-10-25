@@ -28,7 +28,7 @@ Then open http://127.0.0.1:5001. The database (`food.db`) and sample data are cr
 
 ## Live site
 
-https://...run.app
+https://rate-the-food-746021394777.us-west1.run.app/
 
 ## Tech used
 
