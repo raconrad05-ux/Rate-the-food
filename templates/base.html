@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Rate the Food{% endblock %}</title>
   <!-- Pico CSS gives us nice default styles for plain HTML -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <!-- Pinned to an exact version so a Pico update can't change our styling -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
   <style>
     /* A few small tweaks on top of Pico */
     .site-name { font-weight: bold; text-decoration: none; }
@@ -21,6 +22,10 @@
     .form-box { max-width: 28rem; }
     /* Show line breaks the reviewer typed */
     .review-body { white-space: pre-line; }
+    /* Phones: let the header links wrap onto a second line instead of overflowing */
+    nav, nav ul { flex-wrap: wrap; }
+    /* Keep table cells on one line; the table scrolls sideways on small screens */
+    .overflow-auto td, .overflow-auto th { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -33,6 +38,7 @@
         {# g.user is set by load_logged_in_user() in app.py #}
         {% if g.user %}
           <li>Logged in as <strong>{{ g.user.username }}</strong></li>
+          <li><a href="{{ url_for('user_page', username=g.user.username) }}">My reviews</a></li>
           <li>
             {# Logging out changes state, so it's a POST form, not a link #}
             <form action="{{ url_for('logout') }}" method="post" class="inline-form">
@@ -57,7 +63,10 @@
   </main>
 
   <footer class="container">
-    <small class="muted">Rate the Food &middot; Places to eat on and around Santa Clara University</small>
+    <small class="muted">
+      Rate the Food &middot; Places to eat on and around Santa Clara University<br>
+      Sample reviews and users are fictitious, for a class project.
+    </small>
   </footer>
 
   {# Pages can add their own JavaScript here #}

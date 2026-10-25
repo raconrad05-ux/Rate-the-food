@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stars %}
+
+{% block title %}{{ user.username }} – Rate the Food{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('index') }}">&larr; All places</a></p>
+
+<h1>{{ user.username }}{% if g.user and g.user.id == user.id %} <small class="muted">(you)</small>{% endif %}</h1>
+<p class="muted">
+  {{ reviews | length }} review{{ "s" if reviews | length != 1 }}
+  &middot; member since {{ user.created_at[:10] }}
+</p>
+
+{% for review in reviews %}
+  <article>
+    <header>
+      <strong><a href="{{ url_for('place', place_id=review.place_id) }}">{{ review.place_name }}</a></strong>
+      {{ stars(review.rating) }}
+      <small class="muted">{{ review.created_at[:10] }}</small>
+      {% if review.updated_at > review.created_at %}<small class="muted">(edited)</small>{% endif %}
+    </header>
+    <p class="review-body">{{ review.body }}</p>
+  </article>
+{% else %}
+  <p class="muted">No reviews yet.</p>
+{% endfor %}
+{% endblock %}

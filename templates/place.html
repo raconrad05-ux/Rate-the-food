@@ -34,20 +34,23 @@
     <h2>{{ "Edit your review" if my_review else "Write a review" }}</h2>
     {# The same route creates and edits. There's no user id in the form;
        the server uses the logged-in user from the session. #}
+    {# Fill the form with what was just typed (after an error), otherwise
+       with the user's saved review, otherwise leave it empty #}
+    {% set filled = form or my_review %}
     <form method="post" action="{{ url_for('save_review', place_id=place.id) }}">
       <fieldset>
         <legend>Rating</legend>
         {% for n in range(5, 0, -1) %}
           <label>
             <input type="radio" name="rating" value="{{ n }}" required
-                   {% if my_review and my_review.rating == n %}checked{% endif %}>
+                   {% if filled and filled.rating == n %}checked{% endif %}>
             {{ stars(n) }} {{ n }}
           </label>
         {% endfor %}
       </fieldset>
       <label>
         Your review
-        <textarea name="body" rows="4" maxlength="500" required>{{ my_review.body if my_review }}</textarea>
+        <textarea name="body" rows="4" maxlength="500" required>{{ filled.body if filled }}</textarea>
         <small>Up to 500 characters.</small>
       </label>
       <button type="submit">{{ "Update review" if my_review else "Post review" }}</button>
@@ -67,7 +70,7 @@
 {% for review in reviews %}
   <article>
     <header>
-      <strong>{{ review.username }}</strong>
+      <strong><a href="{{ url_for('user_page', username=review.username) }}">{{ review.username }}</a></strong>
       {% if g.user and review.user_id == g.user.id %}<span class="muted">(you)</span>{% endif %}
       {{ stars(review.rating) }}
       {# created_at looks like "2026-10-25 14:03:00"; keep just the date part #}
@@ -89,7 +92,17 @@
   // tojson turns the Python list into a JavaScript array, e.g. [0, 1, 0, 2, 1]
   const counts = {{ rating_counts | tojson }};
 
-  new Chart(document.getElementById("ratingChart"), {
+  // Pico defines its text and border colors for both light and dark mode,
+  // so borrowing them makes the chart's text readable in either theme.
+  function useThemeColors() {
+    const css = getComputedStyle(document.documentElement);
+    Chart.defaults.color = css.getPropertyValue("--pico-color").trim();
+    Chart.defaults.borderColor = css.getPropertyValue("--pico-muted-border-color").trim();
+  }
+  useThemeColors();
+  Chart.defaults.font.size = 14;  // Chart.js's default (12px) is hard to read
+
+  const chart = new Chart(document.getElementById("ratingChart"), {
     type: "bar",
     data: {
       labels: ["1 star", "2 stars", "3 stars", "4 stars", "5 stars"],
@@ -98,8 +111,21 @@
     options: {
       maintainAspectRatio: false,          // fill the 250px box
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },  // whole numbers only
+      scales: {
+        x: { title: { display: true, text: "Rating" } },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 },         // whole numbers only
+          title: { display: true, text: "Number of reviews" },
+        },
+      },
     },
+  });
+
+  // If the device switches between light and dark mode, recolor the chart.
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    useThemeColors();
+    chart.update();
   });
 </script>
 {% endif %}

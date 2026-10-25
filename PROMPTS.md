@@ -59,3 +59,15 @@ POST /place/<int:place_id>/review with @login_required: 404 if the place doesn�
 POST /place/<int:place_id>/review/delete with @login_required: delete only the row matching both this place and g.user’s id. Flash a message and redirect back.
 A user can only ever change their own review because every write uses g.user["id"] from the session, never a user id sent by the form. Add a comment saying so.
 Make sure the average, count and chart on the place page and the home page ranking all reflect changes immediately (they should, since they’re computed by queries).
+
+# PROMPT 6
+Polish step. Keep each change small, with short comments. Don’t change the database schema, and don’t touch my food.db when testing (use FOOD_DB with a temp file as before).
+
+Keep typed input after a review error: instead of redirecting, re-render the place page with the submitted rating and text still filled in, the error message shown, and HTTP status 400.
+Realistic seed dates: give the seed reviews created_at and updated_at values spread randomly over the past 4 months (use a fixed random.seed so the data is the same every time), so the review dates aren’t all identical.
+A user page at /user/<username> that lists that user’s reviews (place name linking to the place, stars, text, date), with a 404 if the username doesn’t exist. Link usernames in the review lists to it, and add a “My reviews” link in the header when logged in.
+500 error handler: a friendly “Something went wrong” page extending base.html, with status 500.
+Footer: add “Sample reviews and users are fictitious, for a class project.”
+Mobile: make sure all pages look fine at phone width (the home page table may need to scroll horizontally on small screens).
+Chart readability: make the Chart.js axis labels and tick numbers readable in both light and dark mode (larger font, and a color that adapts to the theme).
+Pin Pico CSS to an exact version: https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css.

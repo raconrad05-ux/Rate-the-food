@@ -1,6 +1,8 @@
 import os
+import random
 import re
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import (Flask, abort, flash, g, redirect, render_template, request,
@@ -165,13 +167,28 @@ def seed_db():
                 (username, generate_password_hash("password123")),
             )
 
+        # Give each review a random date in the past 4 months. The fixed seed
+        # means the same "random" dates (relative to today) every time.
+        rng = random.Random(107)
+        now = datetime.now(timezone.utc)  # CURRENT_TIMESTAMP is UTC too
+        rows = []
+        for username, place_name, rating, body in REVIEWS:
+            created = now - timedelta(seconds=rng.randint(0, 120 * 24 * 3600))
+            updated = created
+            # About 1 in 5 reviews was edited a little later (never in the future).
+            if rng.random() < 0.2:
+                updated = min(created + timedelta(hours=rng.randint(1, 240)), now)
+            fmt = "%Y-%m-%d %H:%M:%S"  # same text format as CURRENT_TIMESTAMP
+            rows.append((username, place_name, rating, body,
+                         created.strftime(fmt), updated.strftime(fmt)))
+
         # Look up the user and place ids by name inside the INSERT.
         conn.executemany(
-            """INSERT INTO reviews (user_id, place_id, rating, body)
+            """INSERT INTO reviews (user_id, place_id, rating, body, created_at, updated_at)
                VALUES ((SELECT id FROM users WHERE username = ?),
                        (SELECT id FROM places WHERE name = ?),
-                       ?, ?)""",
-            REVIEWS,
+                       ?, ?, ?, ?)""",
+            rows,
         )
     conn.close()
 
@@ -318,11 +335,18 @@ def index():
 @app.route("/place/<int:place_id>")
 def place(place_id):
     """Detail page for one place: info, rating summary, chart and reviews."""
-    db = get_db()
-
-    place = db.execute("SELECT * FROM places WHERE id = ?", (place_id,)).fetchone()
+    place = get_db().execute("SELECT * FROM places WHERE id = ?", (place_id,)).fetchone()
     if place is None:
         abort(404)  # handled by page_not_found() below
+    return render_place_page(place)
+
+
+def render_place_page(place, form=None):
+    """Build the place page. save_review() also uses this to re-show the page
+    after an error; then `form` holds what the user typed so it stays filled in.
+    """
+    db = get_db()
+    place_id = place["id"]
 
     summary = db.execute(
         """SELECT AVG(rating) AS avg_rating, COUNT(*) AS review_count
@@ -368,6 +392,7 @@ def place(place_id):
         rating_counts=rating_counts,
         reviews=reviews,
         my_review=my_review,
+        form=form,
     )
 
 
@@ -380,7 +405,8 @@ def place(place_id):
 def save_review(place_id):
     """Create a new review, or update the user's existing one."""
     db = get_db()
-    if db.execute("SELECT 1 FROM places WHERE id = ?", (place_id,)).fetchone() is None:
+    place = db.execute("SELECT * FROM places WHERE id = ?", (place_id,)).fetchone()
+    if place is None:
         abort(404)
 
     # The rating must be a whole number from 1 to 5 ("4.5" or "abc" fail int()).
@@ -401,8 +427,10 @@ def save_review(place_id):
         error = f"Reviews can be at most 500 characters (yours is {len(body)})."
 
     if error is not None:
+        # Re-show the page (no redirect) so the typed rating and text stay
+        # in the form. The flashed message shows up on this same page.
         flash(error, "error")
-        return redirect(url_for("place", place_id=place_id))
+        return render_place_page(place, form={"rating": rating, "body": body}), 400
 
     # One statement for both cases: INSERT a new row, or, if this user already
     # reviewed this place (the UNIQUE rule), UPDATE that row instead.
@@ -440,7 +468,37 @@ def delete_review(place_id):
     return redirect(url_for("place", place_id=place_id))
 
 
+@app.route("/user/<username>")
+def user_page(username):
+    """List all of one user's reviews, newest first."""
+    db = get_db()
+    # The username column is COLLATE NOCASE, so /user/Demo finds "demo" too.
+    user = db.execute(
+        "SELECT id, username, created_at FROM users WHERE username = ?", (username,)
+    ).fetchone()
+    if user is None:
+        abort(404)
+
+    reviews = db.execute(
+        """SELECT reviews.place_id, reviews.rating, reviews.body,
+                  reviews.created_at, reviews.updated_at, places.name AS place_name
+           FROM reviews
+           JOIN places ON places.id = reviews.place_id
+           WHERE reviews.user_id = ?
+           ORDER BY reviews.created_at DESC, reviews.id DESC""",
+        (user["id"],),
+    ).fetchall()
+    return render_template("user.html", user=user, reviews=reviews)
+
+
 @app.errorhandler(404)
 def page_not_found(error):
     """Show a friendly page for bad URLs and missing places."""
     return render_template("404.html"), 404
+
+
+@app.errorhandler(500)
+def server_error(error):
+    """Show a friendly page when something crashes.
+    (With `flask run --debug` you see the debugger instead.)"""
+    return render_template("500.html"), 500
