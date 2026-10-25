@@ -160,17 +160,23 @@ def seed_db():
             PLACES,
         )
 
-        # Every fake user's password is password123 (stored only as a hash).
-        for username in USERNAMES:
-            conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash("password123")),
-            )
-
-        # Give each review a random date in the past 4 months. The fixed seed
-        # means the same "random" dates (relative to today) every time.
+        # Random dates for the sample data. The fixed seed means the same
+        # "random" dates (relative to today) every time.
         rng = random.Random(107)
         now = datetime.now(timezone.utc)  # CURRENT_TIMESTAMP is UTC too
+        fmt = "%Y-%m-%d %H:%M:%S"  # same text format as CURRENT_TIMESTAMP
+
+        # Every fake user's password is password123 (stored only as a hash).
+        # They joined about 5 months ago (150-165 days), before any of their
+        # reviews (at most 120 days old), so "member since" makes sense.
+        for username in USERNAMES:
+            joined = now - timedelta(seconds=rng.randint(150 * 24 * 3600, 165 * 24 * 3600))
+            conn.execute(
+                "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+                (username, generate_password_hash("password123"), joined.strftime(fmt)),
+            )
+
+        # Give each review a random date in the past 4 months.
         rows = []
         for username, place_name, rating, body in REVIEWS:
             created = now - timedelta(seconds=rng.randint(0, 120 * 24 * 3600))
@@ -178,7 +184,6 @@ def seed_db():
             # About 1 in 5 reviews was edited a little later (never in the future).
             if rng.random() < 0.2:
                 updated = min(created + timedelta(hours=rng.randint(1, 240)), now)
-            fmt = "%Y-%m-%d %H:%M:%S"  # same text format as CURRENT_TIMESTAMP
             rows.append((username, place_name, rating, body,
                          created.strftime(fmt), updated.strftime(fmt)))
 
